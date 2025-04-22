@@ -1,9 +1,7 @@
 const axios = require('axios');
 const { sendMessage } = require('./sendMessage');
-const franc = require('franc-min');
-const iso6391 = require('iso-639-1');
 
-const userSessions = new Map();
+const userMessages = new Map(); // pour stocker le message d'origine par user
 
 const quickReplies = [
   { title: 'Français 🇫🇷', payload: 'FR' },
@@ -15,66 +13,61 @@ const quickReplies = [
   { title: 'Japonais 🇯🇵', payload: 'JA' }
 ];
 
-function detectLanguageLocally(text) {
-  const iso639_3 = franc(text || '');
-  if (iso639_3 === 'und') return 'EN'; // fallback
-  const iso639_1 = iso6391.getCode(iso639_3);
-  return iso639_1 ? iso639_1.toUpperCase() : 'EN';
+function detectLanguage(text) {
+  // Simple détection par Google Translate (gratuit) ou heuristique
+  // Ici on fait simple, mais tu peux utiliser une vraie API ou module comme "franc"
+  if (/^[a-zA-Z\s.,!?']+$/.test(text)) return 'EN';
+  if (/^[a-zA-ZéèàçùâêîôûëïüœÉÈÀÇÙÂÊÎÔÛËÏÜŒ\s.,!?']+$/.test(text)) return 'FR';
+  return 'FR'; // fallback
 }
 
-function getLanguageName(code) {
-  return iso6391.getName(code.toLowerCase()) || code;
-}
-
-async function translateText(text, from, to) {
+async function translateText(text, sourceLang, targetLang) {
+  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`;
   try {
-    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${from}|${to}`;
     const response = await axios.get(url);
-    return response.data?.responseData?.translatedText || 'Traduction non trouvée.';
-  } catch (err) {
-    console.error('Erreur de traduction:', err);
-    return 'Erreur lors de la traduction.';
+    return response.data.responseData.translatedText;
+  } catch (error) {
+    console.error('Erreur traduction :', error);
+    return 'Erreur de traduction.';
   }
 }
 
 async function handleMessage(event, pageAccessToken) {
   const senderId = event?.sender?.id;
-  if (!senderId || !event.message) return;
+  if (!senderId) return;
 
   const message = event.message;
-  const quickReply = message.quick_reply?.payload;
-  const messageText = message.text?.trim();
-
-  if (quickReply) {
-    const session = userSessions.get(senderId);
-    if (!session || !session.originalText || !session.detectedLang) {
-      return sendMessage(senderId, { text: "Aucun message à traduire. Envoie un message d'abord." }, pageAccessToken);
-    }
-
-    const translation = await translateText(session.originalText, session.detectedLang, quickReply);
-    return sendMessage(senderId, {
-      text: `**${getLanguageName(session.detectedLang)} → ${getLanguageName(quickReply)}**\n${translation}`
-    }, pageAccessToken);
-  }
+  const quickReply = message?.quick_reply?.payload;
+  const messageText = message?.text?.trim();
 
   if (!messageText) return;
 
-  const detectedLang = detectLanguageLocally(messageText);
-  userSessions.set(senderId, {
-    originalText: messageText,
-    detectedLang
-  });
+  if (quickReply) {
+    const originalText = userMessages.get(senderId);
+    if (!originalText) {
+      return sendMessage(senderId, { text: "Message original non trouvé." }, pageAccessToken);
+    }
 
-  const langName = getLanguageName(detectedLang);
+    const sourceLang = detectLanguage(originalText);
+    const targetLang = quickReply;
 
-  return sendMessage(senderId, {
-    text: `Langue détectée : ${langName}\nChoisis une langue pour la traduction :`,
+    const translated = await translateText(originalText, sourceLang, targetLang);
+    return sendMessage(senderId, { text: `Traduction (${sourceLang} → ${targetLang}) :\n${translated}` }, pageAccessToken);
+  }
+
+  // Sinon, c'est un message texte normal → on propose les langues
+  userMessages.set(senderId, messageText);
+
+  const quickReplyPayload = {
+    text: 'Dans quelle langue veux-tu traduire ce message ?',
     quick_replies: quickReplies.map(q => ({
       content_type: 'text',
       title: q.title,
       payload: q.payload
     }))
-  }, pageAccessToken);
+  };
+
+  await sendMessage(senderId, quickReplyPayload, pageAccessToken);
 }
 
 module.exports = { handleMessage };
