@@ -16,9 +16,11 @@ const quickReplies = [
 ];
 
 function detectLanguageLocally(text) {
-  const iso639_3 = franc(text);
+  const iso639_3 = franc(text || '');
+  if (iso639_3 === 'und') return 'EN'; // fallback
+
   const lang = languageCodes.all().find(l => l['iso639-3'] === iso639_3);
-  return lang ? lang.iso639_1?.toUpperCase() || 'EN' : 'EN';
+  return lang && lang.iso639_1 ? lang.iso639_1.toUpperCase() : 'EN';
 }
 
 function getLanguageName(code) {
@@ -27,25 +29,23 @@ function getLanguageName(code) {
 }
 
 async function translateText(text, from, to) {
-  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${from}|${to}`;
   try {
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${from}|${to}`;
     const response = await axios.get(url);
-    return response.data.responseData.translatedText;
-  } catch (error) {
-    console.error('Erreur traduction :', error);
-    return 'Erreur de traduction.';
+    return response.data?.responseData?.translatedText || 'Traduction non trouvée.';
+  } catch (err) {
+    console.error('Erreur de traduction:', err);
+    return 'Erreur lors de la traduction.';
   }
 }
 
 async function handleMessage(event, pageAccessToken) {
   const senderId = event?.sender?.id;
-  if (!senderId) return;
+  if (!senderId || !event.message) return;
 
   const message = event.message;
-  const quickReply = message?.quick_reply?.payload;
-  const messageText = message?.text?.trim();
-
-  if (!messageText) return;
+  const quickReply = message.quick_reply?.payload;
+  const messageText = message.text?.trim();
 
   if (quickReply) {
     const session = userSessions.get(senderId);
@@ -59,16 +59,18 @@ async function handleMessage(event, pageAccessToken) {
     }, pageAccessToken);
   }
 
+  if (!messageText) return;
+
   const detectedLang = detectLanguageLocally(messageText);
   userSessions.set(senderId, {
     originalText: messageText,
-    detectedLang: detectedLang
+    detectedLang
   });
 
-  const languageName = getLanguageName(detectedLang);
+  const langName = getLanguageName(detectedLang);
 
-  await sendMessage(senderId, {
-    text: `Langue détectée : ${languageName}. Choisis une langue pour la traduction :`,
+  return sendMessage(senderId, {
+    text: `Langue détectée : ${langName}\nChoisis une langue pour la traduction :`,
     quick_replies: quickReplies.map(q => ({
       content_type: 'text',
       title: q.title,
