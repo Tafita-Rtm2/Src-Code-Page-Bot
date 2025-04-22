@@ -18,7 +18,7 @@
         "express": "^4.19.2",
         "form-data": "^4.0.0",
         "franc-min": "^6.1.0",
-        "language-codes": "^*",
+        "iso-639-1": "^2.1.13",
         "fs": "0.0.1-security",
         "google-translate-api-x": "*",
         "mongodb": "^6.4.0",
