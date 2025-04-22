@@ -1,26 +1,33 @@
 {
-  "name": "nodejs",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "@types/node": "^18.0.6",
-    "axios": "^1.7.2",
-    "body-parser": "^1.20.2",
-    "express": "^4.19.2",
-    "node-fetch": "^3.3.2",
-    "franc": "^*",
-    "iso-639-1": "^*",
-    "request": "^2.88.2",
-    "winston": "^3.13.0"
-  },
-  "engines": {
-    "node": "20.x"
-  }
+    "name": "nodejs",
+    "version": "1.0.0",
+    "description": "Projet Node.js avec gestion d'abonnement MongoDB et génération de réponses vocales.",
+    "main": "index.js",
+    "scripts": {
+        "start": "node index.js",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "@types/node": "^20.11.17",
+        "axios": "^1.6.7",
+        "body-parser": "^1.20.2",
+        "cheerio": "^1.0.0-rc.12",
+        "express": "^4.19.2",
+        "form-data": "^4.0.0",
+        "fs": "0.0.1-security",
+        "google-translate-api-x": "*",
+        "mongodb": "^6.4.0",
+        "mongoose": "^8.1.2",
+        "node-fetch": "^3.3.2",
+        "path": "^0.12.7",
+        "request": "^2.88.2",
+        "winston": "^3.13.0",
+        "sharp": "^0.32.1"
+    },
+    "engines": {
+        "node": "20.x"
+    }
 }
