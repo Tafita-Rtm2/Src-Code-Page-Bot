@@ -1,5 +1,7 @@
 const axios = require('axios');
 const { sendMessage } = require('./sendMessage');
+const franc = require('franc-min');
+const languageCodes = require('language-codes');
 
 const userSessions = new Map();
 
@@ -13,17 +15,15 @@ const quickReplies = [
   { title: 'Japonais 🇯🇵', payload: 'JA' }
 ];
 
-async function detectLanguage(text) {
-  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=auto|en`;
-  try {
-    const response = await axios.get(url);
-    const langPair = response.data.matches?.[0]?.source || response.data.responseData?.match?.langpair || 'en-EN';
-    const sourceLang = langPair.slice(0, 2).toUpperCase();
-    return sourceLang;
-  } catch (error) {
-    console.error('Erreur détection de langue :', error);
-    return 'EN'; // fallback
-  }
+function detectLanguageLocally(text) {
+  const iso639_3 = franc(text);
+  const lang = languageCodes.all().find(l => l['iso639-3'] === iso639_3);
+  return lang ? lang.iso639_1?.toUpperCase() || 'EN' : 'EN';
+}
+
+function getLanguageName(code) {
+  const lang = languageCodes.get(code.toLowerCase());
+  return lang ? lang.name : code;
 }
 
 async function translateText(text, from, to) {
@@ -55,19 +55,20 @@ async function handleMessage(event, pageAccessToken) {
 
     const translation = await translateText(session.originalText, session.detectedLang, quickReply);
     return sendMessage(senderId, {
-      text: `**${session.detectedLang} → ${quickReply}**\n${translation}`
+      text: `**${getLanguageName(session.detectedLang)} → ${getLanguageName(quickReply)}**\n${translation}`
     }, pageAccessToken);
   }
 
-  // Nouvel envoi utilisateur : détecter langue et proposer traductions
-  const detectedLang = await detectLanguage(messageText);
+  const detectedLang = detectLanguageLocally(messageText);
   userSessions.set(senderId, {
     originalText: messageText,
     detectedLang: detectedLang
   });
 
+  const languageName = getLanguageName(detectedLang);
+
   await sendMessage(senderId, {
-    text: `Langue détectée : ${detectedLang}. Choisis la langue de traduction :`,
+    text: `Langue détectée : ${languageName}. Choisis une langue pour la traduction :`,
     quick_replies: quickReplies.map(q => ({
       content_type: 'text',
       title: q.title,
