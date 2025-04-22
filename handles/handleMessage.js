@@ -1,7 +1,7 @@
 const axios = require('axios');
 const { sendMessage } = require('./sendMessage');
 const franc = require('franc-min');
-const languageCodes = require('language-codes');
+const iso6391 = require('iso-639-1');
 
 const userSessions = new Map();
 
@@ -18,14 +18,12 @@ const quickReplies = [
 function detectLanguageLocally(text) {
   const iso639_3 = franc(text || '');
   if (iso639_3 === 'und') return 'EN'; // fallback
-
-  const lang = languageCodes.all().find(l => l['iso639-3'] === iso639_3);
-  return lang && lang.iso639_1 ? lang.iso639_1.toUpperCase() : 'EN';
+  const iso639_1 = iso6391.getCode(iso639_3);
+  return iso639_1 ? iso639_1.toUpperCase() : 'EN';
 }
 
 function getLanguageName(code) {
-  const lang = languageCodes.get(code.toLowerCase());
-  return lang ? lang.name : code;
+  return iso6391.getName(code.toLowerCase()) || code;
 }
 
 async function translateText(text, from, to) {
