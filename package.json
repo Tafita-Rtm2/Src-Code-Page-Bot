@@ -17,6 +17,8 @@
         "cheerio": "^1.0.0-rc.12",
         "express": "^4.19.2",
         "form-data": "^4.0.0",
+        "language-codes": "^*",
+        "franc-min": "^*",
         "fs": "0.0.1-security",
         "google-translate-api-x": "*",
         "mongodb": "^6.4.0",
