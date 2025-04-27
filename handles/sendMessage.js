@@ -32,7 +32,7 @@ payload.message.quick_replies = [
   },
   {
     content_type: "text",
-    title: "📜",
+    title: "Explication📜",
     payload: "LISTE_PAYLOAD"
   }
 ];
