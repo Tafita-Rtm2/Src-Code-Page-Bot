@@ -124,7 +124,7 @@ async function handleMessage(event, pageAccessToken) {
   }
 
   // *** NOUVEAU : si utilisateur envoie 📜 ***
-  if (messageText.includes('📜')) {
+  if (messageText.includes('Explication📜')) {
     const lastOriginal = userOriginalMessages.get(senderId);
 
     if (!lastOriginal) {
