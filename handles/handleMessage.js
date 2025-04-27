@@ -1,8 +1,7 @@
 const axios = require('axios');
 const { sendMessage } = require('./sendMessage');
-const franc = require('franc'); // <= installe cette librairie
 
-const userMessages = new Map();
+const userMessages = new Map(); // pour stocker le message d'origine par user
 
 const quickReplies = [
   { title: 'Français 🇫🇷', payload: 'FR' },
@@ -14,23 +13,25 @@ const quickReplies = [
   { title: 'Japonais 🇯🇵', payload: 'JA' }
 ];
 
-function mapFrancToLang(francLang) {
-  // Mapping de franc ISO 639-3 vers ISO 639-1
-  const map = {
-    fra: 'FR',
-    eng: 'EN',
-    deu: 'DE',
-    spa: 'ES',
-    mal: 'MG',
-    kor: 'KO',
-    jpn: 'JA'
-  };
-  return map[francLang] || 'EN'; // Default English
-}
+// Nouvelle fonction detectLanguage via GPT
+async function detectLanguage(text) {
+  const prompt = `Detect only the language code (2 letters) of this text without translating: "${text}". Reply only with the language code like EN, FR, ES, MG, etc.`;
+  const url = `https://renzweb.onrender.com/api/gpt-4o-all?prompt=${encodeURIComponent(prompt)}&img=&uid=4`;
 
-function detectLanguage(text) {
-  const langFranc = franc(text || '');
-  return mapFrancToLang(langFranc);
+  try {
+    const response = await axios.get(url);
+    const reply = response.data.reply.trim().toUpperCase();
+
+    if (/^[A-Z]{2}$/.test(reply)) {
+      return reply;
+    } else {
+      console.error("Réponse inattendue de GPT :", reply);
+      return 'EN'; // par défaut si réponse étrange
+    }
+  } catch (error) {
+    console.error('Erreur détection langue :', error);
+    return 'EN'; // par défaut si erreur
+  }
 }
 
 async function translateText(text, sourceLang, targetLang) {
@@ -55,28 +56,27 @@ async function handleMessage(event, pageAccessToken) {
   if (!messageText) return;
 
   if (quickReply) {
-    const userData = userMessages.get(senderId);
-    if (!userData) {
+    const originalText = userMessages.get(senderId);
+    if (!originalText) {
       return sendMessage(senderId, { text: "Message original non trouvé." }, pageAccessToken);
     }
 
-    const { originalText, sourceLang } = userData;
+    const sourceLang = await detectLanguage(originalText); // Modifié ici aussi → await
     const targetLang = quickReply;
 
-    if (sourceLang.toUpperCase() === targetLang.toUpperCase()) {
-      await sendMessage(senderId, { text: `Pas besoin de traduire : c'est déjà en ${targetLang}. Voici ton message :\n\n${originalText}` }, pageAccessToken);
-      return;
+    if (sourceLang === targetLang) {
+      return sendMessage(senderId, { text: "La langue source et cible sont identiques. Choisis une langue différente." }, pageAccessToken);
     }
 
     const translated = await translateText(originalText, sourceLang, targetLang);
     return sendMessage(senderId, { text: `Traduction (${sourceLang} → ${targetLang}) :\n${translated}` }, pageAccessToken);
   }
 
-  const sourceLang = detectLanguage(messageText);
-  userMessages.set(senderId, { originalText: messageText, sourceLang });
+  // Sinon, c'est un message texte normal → on propose les langues
+  userMessages.set(senderId, messageText);
 
   const quickReplyPayload = {
-    text: `Message détecté en ${sourceLang}. Dans quelle langue veux-tu traduire ce message ?`,
+    text: 'Dans quelle langue veux-tu traduire ce message ?',
     quick_replies: quickReplies.map(q => ({
       content_type: 'text',
       title: q.title,
