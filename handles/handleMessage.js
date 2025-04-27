@@ -20,6 +20,8 @@ const quickReplies = [
 const langFlags = {
   FR: '🇫🇷', EN: '🇬🇧', DE: '🇩🇪', ES: '🇪🇸', MG: '🇲🇬', KO: '🇰🇷', JA: '🇯🇵'
 };
+
+// Fonction pour activer l'indicateur "typing..."
 async function sendTypingIndicator(senderId, pageAccessToken) {
   try {
     await axios.post(
@@ -33,6 +35,7 @@ async function sendTypingIndicator(senderId, pageAccessToken) {
     console.error('Erreur envoi typing indicator :', error);
   }
 }
+
 async function detectLanguage(text) {
   const prompt = `Detect only the language code (2 letters) of this text without translating: "${text}". Reply only with the language code like EN, FR, ES, MG, etc.`;
   const url = `https://renzweb.onrender.com/api/gpt-4o-all?prompt=${encodeURIComponent(prompt)}&img=&uid=4`;
