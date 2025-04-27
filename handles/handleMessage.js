@@ -1,7 +1,9 @@
 const axios = require('axios');
 const { sendMessage } = require('./sendMessage');
+const franc = require('franc');
+const langs = require('langs');
 
-const userMessages = new Map(); // pour stocker le message d'origine par user
+const userMessages = new Map(); // stocke { original text, detected language }
 
 const quickReplies = [
   { title: 'Français 🇫🇷', payload: 'FR' },
@@ -13,12 +15,21 @@ const quickReplies = [
   { title: 'Japonais 🇯🇵', payload: 'JA' }
 ];
 
+// Détecte automatiquement n'importe quelle langue
 function detectLanguage(text) {
-  // Simple détection par Google Translate (gratuit) ou heuristique
-  // Ici on fait simple, mais tu peux utiliser une vraie API ou module comme "franc"
-  if (/^[a-zA-Z\s.,!?']+$/.test(text)) return 'EN';
-  if (/^[a-zA-ZéèàçùâêîôûëïüœÉÈÀÇÙÂÊÎÔÛËÏÜŒ\s.,!?']+$/.test(text)) return 'FR';
-  return 'FR'; // fallback
+  const langCode = franc(text);
+
+  if (langCode === 'und') {
+    return 'EN'; // fallback si pas détecté
+  }
+
+  const language = langs.where('3', langCode);
+  if (!language) {
+    return 'EN'; // fallback si inconnu
+  }
+
+  // Retourne ISO-639-1 code (2 lettres) si dispo, sinon 3 lettres
+  return language['1'] || langCode;
 }
 
 async function translateText(text, sourceLang, targetLang) {
@@ -43,23 +54,25 @@ async function handleMessage(event, pageAccessToken) {
   if (!messageText) return;
 
   if (quickReply) {
-    const originalText = userMessages.get(senderId);
-    if (!originalText) {
+    const userData = userMessages.get(senderId);
+    if (!userData) {
       return sendMessage(senderId, { text: "Message original non trouvé." }, pageAccessToken);
     }
 
-    const sourceLang = detectLanguage(originalText);
+    const { originalText, sourceLang } = userData;
     const targetLang = quickReply;
 
     const translated = await translateText(originalText, sourceLang, targetLang);
     return sendMessage(senderId, { text: `Traduction (${sourceLang} → ${targetLang}) :\n${translated}` }, pageAccessToken);
   }
 
-  // Sinon, c'est un message texte normal → on propose les langues
-  userMessages.set(senderId, messageText);
+  // Sinon, on reçoit un nouveau message texte normal
+  const detectedLang = detectLanguage(messageText);
+
+  userMessages.set(senderId, { originalText: messageText, sourceLang: detectedLang });
 
   const quickReplyPayload = {
-    text: 'Dans quelle langue veux-tu traduire ce message ?',
+    text: `Message détecté en [${detectedLang}]. Vers quelle langue veux-tu traduire ?`,
     quick_replies: quickReplies.map(q => ({
       content_type: 'text',
       title: q.title,
