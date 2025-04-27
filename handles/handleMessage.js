@@ -3,7 +3,6 @@ const franc = require('franc-min');
 const iso6391 = require('iso-639-1');
 const { sendMessage } = require('./sendMessage');
 
-// Mémoire par utilisateur : { message: string, lang: string }
 const userMemory = new Map();
 
 const quickReplies = [
@@ -17,9 +16,19 @@ const quickReplies = [
 ];
 
 function detectLanguage(text) {
-  const langCode3 = franc(text);
-  const langCode2 = iso6391.getCode(langCode3);
-  return langCode2 ? langCode2.toUpperCase() : 'EN'; // fallback
+  const lang3 = franc(text);
+  if (lang3 === 'und') {
+    console.warn('Langue non détectée, fallback EN');
+    return 'EN';
+  }
+
+  const lang2 = iso6391.getCode(lang3); // ex: 'fra' → 'fr'
+  if (!lang2) {
+    console.warn(`Langue ISO non trouvée pour ${lang3}, fallback EN`);
+    return 'EN';
+  }
+
+  return lang2.toUpperCase();
 }
 
 async function translateText(text, sourceLang, targetLang) {
@@ -41,11 +50,10 @@ async function handleMessage(event, pageAccessToken) {
   const quickReply = message?.quick_reply?.payload;
   const messageText = message?.text?.trim();
 
-  if (!messageText) return;
-
   if (quickReply) {
     const memory = userMemory.get(senderId);
     if (!memory) {
+      console.warn('Mémoire vide pour quick reply', senderId);
       return sendMessage(senderId, { text: "Aucun message précédent trouvé pour traduire." }, pageAccessToken);
     }
 
@@ -56,20 +64,20 @@ async function handleMessage(event, pageAccessToken) {
     }, pageAccessToken);
   }
 
-  // Détection de la langue et enregistrement
-  const detectedLang = detectLanguage(messageText);
-  userMemory.set(senderId, { message: messageText, lang: detectedLang });
+  if (messageText) {
+    const detectedLang = detectLanguage(messageText);
+    userMemory.set(senderId, { message: messageText, lang: detectedLang });
+    console.log('Mémoire mise à jour :', userMemory);
 
-  const quickReplyPayload = {
-    text: `Langue détectée : ${detectedLang}. En quelle langue veux-tu le traduire ?`,
-    quick_replies: quickReplies.map(q => ({
-      content_type: 'text',
-      title: q.title,
-      payload: q.payload
-    }))
-  };
+    const quickReplyPayload = {
+      text: `Langue détectée : ${detectedLang}. En quelle langue veux-tu le traduire ?`,
+      quick_replies: quickReplies.map(q => ({
+        content_type: 'text',
+        title: q.title,
+        payload: q.payload
+      }))
+    };
 
-  await sendMessage(senderId, quickReplyPayload, pageAccessToken);
+    return sendMessage(senderId, quickReplyPayload, pageAccessToken);
+  }
 }
-
-module.exports = { handleMessage };
