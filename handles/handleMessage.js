@@ -3,9 +3,9 @@ const { sendMessage } = require('./sendMessage');
 const translate = require('google-translate-api-x');
 const googleTTS = require('google-tts-api');
 
-const userMessages = new Map(); 
-const userLastTranslations = new Map(); 
-const userOriginalMessages = new Map(); // nouveau pour stocker les messages originaux pour 📜
+const userMessages = new Map();
+const userLastTranslations = new Map();
+const userOriginalMessages = new Map(); // pour explication 📜
 
 const quickReplies = [
   { title: 'Français 🇫🇷', payload: 'FR' },
@@ -21,6 +21,22 @@ const langFlags = {
   FR: '🇫🇷', EN: '🇬🇧', DE: '🇩🇪', ES: '🇪🇸', MG: '🇲🇬', KO: '🇰🇷', JA: '🇯🇵'
 };
 
+// Fonction pour activer l'indicateur "typing..."
+async function sendTypingIndicator(senderId, pageAccessToken) {
+  try {
+    await axios.post(
+      `https://graph.facebook.com/v18.0/me/messages?access_token=${pageAccessToken}`,
+      {
+        recipient: { id: senderId },
+        sender_action: 'typing_on'
+      }
+    );
+  } catch (error) {
+    console.error('Erreur envoi typing indicator :', error);
+  }
+}
+
+// Détecter la langue
 async function detectLanguage(text) {
   const prompt = `Detect only the language code (2 letters) of this text without translating: "${text}". Reply only with the language code like EN, FR, ES, MG, etc.`;
   const url = `https://renzweb.onrender.com/api/gpt-4o-all?prompt=${encodeURIComponent(prompt)}&img=&uid=4`;
@@ -41,18 +57,18 @@ async function detectLanguage(text) {
   }
 }
 
+// Traduire le texte
 async function translateText(text, sourceLang, targetLang) {
-  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`;
   try {
-    const response = await axios.get(url);
-    return response.data.responseData.translatedText;
+    const res = await translate(text, { from: sourceLang, to: targetLang });
+    return res.text;
   } catch (error) {
     console.error('Erreur traduction :', error);
     return 'Erreur de traduction.';
   }
 }
 
-// Fonction pour expliquer un texte
+// Expliquer un texte
 async function explainText(text) {
   const prompt = `Explique simplement cette phrase : "${text}". Donne une explication courte et facile à comprendre.`;
   const url = `https://renzweb.onrender.com/api/gpt-4o-all?prompt=${encodeURIComponent(prompt)}&img=&uid=4`;
@@ -66,6 +82,7 @@ async function explainText(text) {
   }
 }
 
+// Handler principal
 async function handleMessage(event, pageAccessToken) {
   const senderId = event?.sender?.id;
   if (!senderId) return;
@@ -76,8 +93,10 @@ async function handleMessage(event, pageAccessToken) {
 
   if (!messageText) return;
 
-  // *** NOUVEAU : si utilisateur envoie 🔊 ***
+  // Si utilisateur envoie 🔊 pour lire la traduction en audio
   if (messageText.includes('🔊')) {
+    await sendTypingIndicator(senderId, pageAccessToken);
+
     const lastTranslation = userLastTranslations.get(senderId);
     const lastLang = userLastTranslations.get(`${senderId}_lang`) || 'en';
 
@@ -108,8 +127,10 @@ async function handleMessage(event, pageAccessToken) {
     }
   }
 
-  // *** NOUVEAU : si utilisateur envoie 📜 ***
-  if (messageText.includes('📜')) {
+  // Si utilisateur envoie 📜 pour expliquer la phrase
+  if (messageText.includes('expl:📜')) {
+    await sendTypingIndicator(senderId, pageAccessToken);
+
     const lastOriginal = userOriginalMessages.get(senderId);
 
     if (!lastOriginal) {
@@ -118,10 +139,13 @@ async function handleMessage(event, pageAccessToken) {
 
     const explanation = await explainText(lastOriginal);
 
-    return sendMessage(senderId, { text: `Explication :\n${explanation}` }, pageAccessToken);
+    return sendMessage(senderId, { text: `Explication 📖 :\n\n${explanation}` }, pageAccessToken);
   }
 
+  // Si utilisateur a répondu à une quick reply
   if (quickReply) {
+    await sendTypingIndicator(senderId, pageAccessToken);
+
     const originalText = userMessages.get(senderId);
     if (!originalText) {
       return sendMessage(senderId, { text: "Message original non trouvé." }, pageAccessToken);
@@ -136,7 +160,7 @@ async function handleMessage(event, pageAccessToken) {
 
     const translated = await translateText(originalText, sourceLang, targetLang);
 
-    const prettyMessage = `\n${langFlags[sourceLang] || sourceLang} → ${langFlags[targetLang] || targetLang}\n\n"${translated}"\n\nLangue source : ${sourceLang}\nLangue cible : ${targetLang}`;
+    const prettyMessage = `${langFlags[sourceLang] || sourceLang} → ${langFlags[targetLang] || targetLang}\n\n"${translated}"\n\nLangue source : ${sourceLang}\nLangue cible : ${targetLang}`;
 
     await sendMessage(senderId, { text: prettyMessage }, pageAccessToken);
 
@@ -145,7 +169,7 @@ async function handleMessage(event, pageAccessToken) {
     return;
   }
 
-  // Stocker le message utilisateur pour traduction et explication
+  // Si message normal : proposer la traduction
   userMessages.set(senderId, messageText);
   userOriginalMessages.set(senderId, messageText);
 
