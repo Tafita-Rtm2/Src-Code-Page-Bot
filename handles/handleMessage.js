@@ -1,9 +1,7 @@
 const axios = require('axios');
-const franc = require('franc-min');
-const iso6391 = require('iso-639-1');
 const { sendMessage } = require('./sendMessage');
 
-const userMemory = new Map();
+const userMessages = new Map(); // pour stocker le message d'origine par user
 
 const quickReplies = [
   { title: 'Français 🇫🇷', payload: 'FR' },
@@ -16,19 +14,11 @@ const quickReplies = [
 ];
 
 function detectLanguage(text) {
-  const lang3 = franc(text);
-  if (lang3 === 'und') {
-    console.warn('Langue non détectée, fallback EN');
-    return 'EN';
-  }
-
-  const lang2 = iso6391.getCode(lang3); // ex: 'fra' → 'fr'
-  if (!lang2) {
-    console.warn(`Langue ISO non trouvée pour ${lang3}, fallback EN`);
-    return 'EN';
-  }
-
-  return lang2.toUpperCase();
+  // Simple détection par Google Translate (gratuit) ou heuristique
+  // Ici on fait simple, mais tu peux utiliser une vraie API ou module comme "franc"
+  if (/^[a-zA-Z\s.,!?']+$/.test(text)) return 'EN';
+  if (/^[a-zA-ZéèàçùâêîôûëïüœÉÈÀÇÙÂÊÎÔÛËÏÜŒ\s.,!?']+$/.test(text)) return 'FR';
+  return 'FR'; // fallback
 }
 
 async function translateText(text, sourceLang, targetLang) {
@@ -50,34 +40,34 @@ async function handleMessage(event, pageAccessToken) {
   const quickReply = message?.quick_reply?.payload;
   const messageText = message?.text?.trim();
 
+  if (!messageText) return;
+
   if (quickReply) {
-    const memory = userMemory.get(senderId);
-    if (!memory) {
-      console.warn('Mémoire vide pour quick reply', senderId);
-      return sendMessage(senderId, { text: "Aucun message précédent trouvé pour traduire." }, pageAccessToken);
+    const originalText = userMessages.get(senderId);
+    if (!originalText) {
+      return sendMessage(senderId, { text: "Message original non trouvé." }, pageAccessToken);
     }
 
-    const { message: originalText, lang: detectedLang } = memory;
-    const translated = await translateText(originalText, detectedLang, quickReply);
-    return sendMessage(senderId, {
-      text: `Traduction (${detectedLang} → ${quickReply}) :\n${translated}`
-    }, pageAccessToken);
+    const sourceLang = detectLanguage(originalText);
+    const targetLang = quickReply;
+
+    const translated = await translateText(originalText, sourceLang, targetLang);
+    return sendMessage(senderId, { text: `Traduction (${sourceLang} → ${targetLang}) :\n${translated}` }, pageAccessToken);
   }
 
-  if (messageText) {
-    const detectedLang = detectLanguage(messageText);
-    userMemory.set(senderId, { message: messageText, lang: detectedLang });
-    console.log('Mémoire mise à jour :', userMemory);
+  // Sinon, c'est un message texte normal → on propose les langues
+  userMessages.set(senderId, messageText);
 
-    const quickReplyPayload = {
-      text: `Langue détectée : ${detectedLang}. En quelle langue veux-tu le traduire ?`,
-      quick_replies: quickReplies.map(q => ({
-        content_type: 'text',
-        title: q.title,
-        payload: q.payload
-      }))
-    };
+  const quickReplyPayload = {
+    text: 'Dans quelle langue veux-tu traduire ce message ?',
+    quick_replies: quickReplies.map(q => ({
+      content_type: 'text',
+      title: q.title,
+      payload: q.payload
+    }))
+  };
 
-    return sendMessage(senderId, quickReplyPayload, pageAccessToken);
-  }
+  await sendMessage(senderId, quickReplyPayload, pageAccessToken);
 }
+
+module.exports = { handleMessage };
