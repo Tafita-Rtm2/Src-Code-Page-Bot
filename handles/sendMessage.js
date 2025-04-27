@@ -27,7 +27,7 @@ function sendMessage(senderId, message, pageAccessToken) {
     payload.message.quick_replies = [
       {
         content_type: "text",
-        title: "Menu",
+        title: "🔊",
         payload: "MENU_PAYLOAD"
       }
     ];
