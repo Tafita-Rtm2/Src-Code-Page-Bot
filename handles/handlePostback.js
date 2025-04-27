@@ -1,5 +1,5 @@
 const { sendMessage } = require('./sendMessage');
-const axios = require('axios'); // pour récupérer le prénom de l'utilisateur
+const axios = require('axios'); // pour récupérer le prénom
 
 const handlePostback = async (event, pageAccessToken) => {
   const { id: senderId } = event.sender || {};
@@ -8,8 +8,8 @@ const handlePostback = async (event, pageAccessToken) => {
   if (!senderId || !payload) return console.error('Invalid postback event object');
 
   try {
-    if (payload === 'GET_STARTED') { // si c'est le bouton "Démarrer"
-      // Appel API Facebook pour récupérer le prénom
+    if (payload === 'get_started_button') { // <-- ici on met ton vrai payload
+      // Appel à Facebook Graph API pour récupérer le prénom
       const response = await axios.get(`https://graph.facebook.com/${senderId}?fields=first_name&access_token=${pageAccessToken}`);
       const firstName = response.data.first_name || '';
 
@@ -21,7 +21,7 @@ Tapez, et commençons à traduire ! 💬`;
 
       await sendMessage(senderId, { text: welcomeMessage }, pageAccessToken);
     } else {
-      // réponse générique pour d'autres postbacks
+      // pour les autres postbacks normaux
       await sendMessage(senderId, { text: `Vous avez envoyé un postback avec le payload : ${payload}` }, pageAccessToken);
     }
   } catch (err) {
