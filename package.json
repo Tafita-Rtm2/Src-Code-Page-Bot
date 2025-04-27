@@ -29,6 +29,8 @@
         "winston": "^3.13.0",
         "axios": "^1.6.8",
         "franc-min": "^6.1.0",
+        "google-translate-api-x": "^*",
+        "google-tts-api": "^*",
         "franc": "^6.1.0",
         "langs": "^2.0.0",
         "sharp": "^0.32.1"
