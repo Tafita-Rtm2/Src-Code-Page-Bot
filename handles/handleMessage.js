@@ -1,10 +1,11 @@
 const axios = require('axios');
 const { sendMessage } = require('./sendMessage');
-const translate = require('google-translate-api-x'); // ajouté
-const googleTTS = require('google-tts-api'); // ajouté
+const translate = require('google-translate-api-x');
+const googleTTS = require('google-tts-api');
 
 const userMessages = new Map(); 
-const userLastTranslations = new Map(); // nouveau pour garder la dernière traduction
+const userLastTranslations = new Map(); 
+const userOriginalMessages = new Map(); // nouveau pour stocker les messages originaux pour 📜
 
 const quickReplies = [
   { title: 'Français 🇫🇷', payload: 'FR' },
@@ -20,7 +21,6 @@ const langFlags = {
   FR: '🇫🇷', EN: '🇬🇧', DE: '🇩🇪', ES: '🇪🇸', MG: '🇲🇬', KO: '🇰🇷', JA: '🇯🇵'
 };
 
-// Fonction pour détecter la langue via GPT
 async function detectLanguage(text) {
   const prompt = `Detect only the language code (2 letters) of this text without translating: "${text}". Reply only with the language code like EN, FR, ES, MG, etc.`;
   const url = `https://renzweb.onrender.com/api/gpt-4o-all?prompt=${encodeURIComponent(prompt)}&img=&uid=4`;
@@ -41,7 +41,6 @@ async function detectLanguage(text) {
   }
 }
 
-// Fonction traduction via MyMemory (on la laisse comme chez toi)
 async function translateText(text, sourceLang, targetLang) {
   const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`;
   try {
@@ -50,6 +49,20 @@ async function translateText(text, sourceLang, targetLang) {
   } catch (error) {
     console.error('Erreur traduction :', error);
     return 'Erreur de traduction.';
+  }
+}
+
+// Fonction pour expliquer un texte
+async function explainText(text) {
+  const prompt = `Explique simplement cette phrase : "${text}". Donne une explication courte et facile à comprendre.`;
+  const url = `https://renzweb.onrender.com/api/gpt-4o-all?prompt=${encodeURIComponent(prompt)}&img=&uid=4`;
+
+  try {
+    const response = await axios.get(url);
+    return response.data.reply.trim();
+  } catch (error) {
+    console.error('Erreur explication :', error);
+    return "Erreur lors de l'explication.";
   }
 }
 
@@ -63,7 +76,7 @@ async function handleMessage(event, pageAccessToken) {
 
   if (!messageText) return;
 
-  // *** NOUVEAU : Si le message est 🔊 ***
+  // *** NOUVEAU : si utilisateur envoie 🔊 ***
   if (messageText.includes('🔊')) {
     const lastTranslation = userLastTranslations.get(senderId);
     const lastLang = userLastTranslations.get(`${senderId}_lang`) || 'en';
@@ -95,6 +108,19 @@ async function handleMessage(event, pageAccessToken) {
     }
   }
 
+  // *** NOUVEAU : si utilisateur envoie 📜 ***
+  if (messageText.includes('📜')) {
+    const lastOriginal = userOriginalMessages.get(senderId);
+
+    if (!lastOriginal) {
+      return sendMessage(senderId, { text: "Aucun message original à expliquer." }, pageAccessToken);
+    }
+
+    const explanation = await explainText(lastOriginal);
+
+    return sendMessage(senderId, { text: `Explication :\n${explanation}` }, pageAccessToken);
+  }
+
   if (quickReply) {
     const originalText = userMessages.get(senderId);
     if (!originalText) {
@@ -110,20 +136,18 @@ async function handleMessage(event, pageAccessToken) {
 
     const translated = await translateText(originalText, sourceLang, targetLang);
 
-    // *** NOUVEAU affichage stylé avec drapeaux ***
     const prettyMessage = `\n${langFlags[sourceLang] || sourceLang} → ${langFlags[targetLang] || targetLang}\n\n"${translated}"\n\nLangue source : ${sourceLang}\nLangue cible : ${targetLang}`;
 
     await sendMessage(senderId, { text: prettyMessage }, pageAccessToken);
 
-    // *** NOUVEAU : on garde en mémoire la dernière traduction pour 🔊 ***
     userLastTranslations.set(senderId, translated);
     userLastTranslations.set(`${senderId}_lang`, targetLang);
-
     return;
   }
 
-  // Message normal
+  // Stocker le message utilisateur pour traduction et explication
   userMessages.set(senderId, messageText);
+  userOriginalMessages.set(senderId, messageText);
 
   const quickReplyPayload = {
     text: 'Dans quelle langue veux-tu traduire ce message ?',
