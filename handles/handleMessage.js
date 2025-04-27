@@ -1,7 +1,10 @@
 const axios = require('axios');
 const { sendMessage } = require('./sendMessage');
+const translate = require('google-translate-api-x'); // ajouté
+const googleTTS = require('google-tts-api'); // ajouté
 
-const userMessages = new Map(); // pour stocker le message d'origine par user
+const userMessages = new Map(); 
+const userLastTranslations = new Map(); // nouveau pour garder la dernière traduction
 
 const quickReplies = [
   { title: 'Français 🇫🇷', payload: 'FR' },
@@ -13,7 +16,11 @@ const quickReplies = [
   { title: 'Japonais 🇯🇵', payload: 'JA' }
 ];
 
-// Nouvelle fonction detectLanguage via GPT
+const langFlags = {
+  FR: '🇫🇷', EN: '🇬🇧', DE: '🇩🇪', ES: '🇪🇸', MG: '🇲🇬', KO: '🇰🇷', JA: '🇯🇵'
+};
+
+// Fonction pour détecter la langue via GPT
 async function detectLanguage(text) {
   const prompt = `Detect only the language code (2 letters) of this text without translating: "${text}". Reply only with the language code like EN, FR, ES, MG, etc.`;
   const url = `https://renzweb.onrender.com/api/gpt-4o-all?prompt=${encodeURIComponent(prompt)}&img=&uid=4`;
@@ -26,14 +33,15 @@ async function detectLanguage(text) {
       return reply;
     } else {
       console.error("Réponse inattendue de GPT :", reply);
-      return 'EN'; // par défaut si réponse étrange
+      return 'EN';
     }
   } catch (error) {
     console.error('Erreur détection langue :', error);
-    return 'EN'; // par défaut si erreur
+    return 'EN';
   }
 }
 
+// Fonction traduction via MyMemory (on la laisse comme chez toi)
 async function translateText(text, sourceLang, targetLang) {
   const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`;
   try {
@@ -55,13 +63,45 @@ async function handleMessage(event, pageAccessToken) {
 
   if (!messageText) return;
 
+  // *** NOUVEAU : Si le message est 🔊 ***
+  if (messageText.includes('🔊')) {
+    const lastTranslation = userLastTranslations.get(senderId);
+    const lastLang = userLastTranslations.get(`${senderId}_lang`) || 'en';
+
+    if (!lastTranslation) {
+      return sendMessage(senderId, { text: "Aucune traduction récente trouvée." }, pageAccessToken);
+    }
+
+    try {
+      const url = googleTTS.getAudioUrl(lastTranslation, {
+        lang: lastLang.toLowerCase(),
+        slow: false,
+        host: 'https://translate.google.com'
+      });
+
+      const audioPayload = {
+        attachment: {
+          type: "audio",
+          payload: {
+            url: url
+          }
+        }
+      };
+
+      return sendMessage(senderId, audioPayload, pageAccessToken);
+    } catch (error) {
+      console.error('Erreur TTS :', error);
+      return sendMessage(senderId, { text: "Erreur génération audio." }, pageAccessToken);
+    }
+  }
+
   if (quickReply) {
     const originalText = userMessages.get(senderId);
     if (!originalText) {
       return sendMessage(senderId, { text: "Message original non trouvé." }, pageAccessToken);
     }
 
-    const sourceLang = await detectLanguage(originalText); // Modifié ici aussi → await
+    const sourceLang = await detectLanguage(originalText);
     const targetLang = quickReply;
 
     if (sourceLang === targetLang) {
@@ -69,10 +109,20 @@ async function handleMessage(event, pageAccessToken) {
     }
 
     const translated = await translateText(originalText, sourceLang, targetLang);
-    return sendMessage(senderId, { text: `Traduction (${sourceLang} → ${targetLang}) :\n${translated}` }, pageAccessToken);
+
+    // *** NOUVEAU affichage stylé avec drapeaux ***
+    const prettyMessage = `\n${langFlags[sourceLang] || sourceLang} → ${langFlags[targetLang] || targetLang}\n\n"${translated}"\n\nLangue source : ${sourceLang}\nLangue cible : ${targetLang}`;
+
+    await sendMessage(senderId, { text: prettyMessage }, pageAccessToken);
+
+    // *** NOUVEAU : on garde en mémoire la dernière traduction pour 🔊 ***
+    userLastTranslations.set(senderId, translated);
+    userLastTranslations.set(`${senderId}_lang`, targetLang);
+
+    return;
   }
 
-  // Sinon, c'est un message texte normal → on propose les langues
+  // Message normal
   userMessages.set(senderId, messageText);
 
   const quickReplyPayload = {
