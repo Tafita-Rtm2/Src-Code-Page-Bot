@@ -24,13 +24,18 @@ function sendMessage(senderId, message, pageAccessToken) {
     payload.message.quick_replies = message.quick_replies;
   } else {
     // Ajouter le bouton Quick Reply "Menu" si aucun Quick Reply n'est défini
-    payload.message.quick_replies = [
-      {
-        content_type: "text",
-        title: "🔊",
-        payload: "MENU_PAYLOAD"
-      }
-    ];
+payload.message.quick_replies = [
+  {
+    content_type: "text",
+    title: "🔊",
+    payload: "MENU_PAYLOAD"
+  },
+  {
+    content_type: "text",
+    title: "📜",
+    payload: "LISTE_PAYLOAD"
+  }
+];
   }
 
   request({
