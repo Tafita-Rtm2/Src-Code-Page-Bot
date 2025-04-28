@@ -42,10 +42,10 @@ async function detectLanguage(text) {
 
   try {
     const response = await axios.get(url);
-    const reply = response.data.reply.trim().toUpperCase();
+    const response = response.data.response.trim().toUpperCase();
 
-    if (/^[A-Z]{2}$/.test(reply)) {
-      return reply;
+    if (/^[A-Z]{2}$/.test(response)) {
+      return response;
     } else {
       console.error("Réponse inattendue de GPT :", reply);
       return 'EN';
