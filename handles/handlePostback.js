@@ -22,8 +22,8 @@ async function handlePostback(event, pageAccessToken) {
 
   // Préparer le message de bienvenue avec le prénom
   const welcomeText = userName
-    ? `👋 Bienvenue ${userName}  sur Bot traduction rtm,entrer votre  texte et traduir le ou obtenu des explication! 😊`
-    : `👋 Bienvenue sur Bot traduction rtm,entrer votre  texte et traduir le ou obtenu des explication 😊`;
+    ? `👋 Bienvenue ${userName} sur Bot Traduction RTM. Entrez votre texte pour le traduire ou obtenir des explications. 😊`
+    : ` 👋 Bienvenue ${userName} sur Bot Traduction RTM. Entrez votre texte pour le traduire ou obtenir des explications. 😊`;
 
   // Envoyer le message de bienvenue
   sendMessage(senderId, { text: welcomeText }, pageAccessToken);
