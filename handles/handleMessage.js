@@ -38,14 +38,14 @@ async function sendTypingIndicator(senderId, pageAccessToken) {
 
 async function detectLanguage(text) {
   const prompt = `Detect only the language code (2 letters) of this text without translating: "${text}". Reply only with the language code like EN, FR, ES, MG, etc.`;
-  const url = `https://zen-api.gleeze.com/api/chatgpt4?prompt=${encodeURIComponent(prompt)}`;
+  const url = `https://renzweb.onrender.com/api/gpt-4o-all?prompt=${encodeURIComponent(prompt)}&img=&uid=4`;
 
   try {
     const response = await axios.get(url);
-    const response = response.data.response.trim().toUpperCase();
+    const reply = response.data.reply.trim().toUpperCase();
 
-    if (/^[A-Z]{2}$/.test(response)) {
-      return response;
+    if (/^[A-Z]{2}$/.test(reply)) {
+      return reply;
     } else {
       console.error("Réponse inattendue de GPT :", reply);
       return 'EN';
@@ -70,7 +70,7 @@ async function translateText(text, sourceLang, targetLang) {
 // Fonction pour expliquer un texte
 async function explainText(text) {
   const prompt = `Explique simplement cette phrase : "${text}". Donne une explication courte et facile à comprendre.`;
-  const url = `https://zen-api.gleeze.com/api/chatgpt4?prompt=${encodeURIComponent(prompt)}`;
+  const url = `https://renzweb.onrender.com/api/gpt-4o-all?prompt=${encodeURIComponent(prompt)}&img=&uid=4`;
 
   try {
     const response = await axios.get(url);
