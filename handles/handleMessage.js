@@ -38,7 +38,7 @@ async function sendTypingIndicator(senderId, pageAccessToken) {
 
 async function detectLanguage(text) {
   const prompt = `Detect only the language code (2 letters) of this text without translating: "${text}". Reply only with the language code like EN, FR, ES, MG, etc.`;
-  const url = `https://renzweb.onrender.com/api/gpt-4o-all?prompt=${encodeURIComponent(prompt)}&img=&uid=4`;
+  const url = `https://zen-api.gleeze.com/api/chatgpt4?prompt=${encodeURIComponent(prompt)}`;
 
   try {
     const response = await axios.get(url);
@@ -70,7 +70,7 @@ async function translateText(text, sourceLang, targetLang) {
 // Fonction pour expliquer un texte
 async function explainText(text) {
   const prompt = `Explique simplement cette phrase : "${text}". Donne une explication courte et facile à comprendre.`;
-  const url = `https://renzweb.onrender.com/api/gpt-4o-all?prompt=${encodeURIComponent(prompt)}&img=&uid=4`;
+  const url = `https://zen-api.gleeze.com/api/chatgpt4?prompt=${encodeURIComponent(prompt)}`;
 
   try {
     const response = await axios.get(url);
